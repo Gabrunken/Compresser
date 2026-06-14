@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <raylib/raylib.h>
+
 #define FLAG_DEBUG 1
 
 uint8_t flags;
@@ -150,13 +152,50 @@ void PrintHelpMenu()
         "\t-e EXTRACT/DECOMPRESS\n");
 }
 
-int main(int argc, char** argv)
+bool WindowProcedure()
 {
-    if (argc < 2)
+    InitWindow(100, 100, "Compressor");
+
+    int monitor = GetCurrentMonitor();
+
+    int screenWidth = GetMonitorWidth(monitor) / 2;
+    int screenHeight = GetMonitorHeight(monitor) / 2;
+
+    SetWindowSize(screenWidth, screenHeight);
+
+    int windowX = (GetMonitorWidth(monitor) - screenWidth) / 2;
+    int windowY = (GetMonitorHeight(monitor) - screenHeight) / 2;
+    SetWindowPosition(windowX, windowY);
+
+    SetTargetFPS(60);
+
+    Font font = LoadFont("./resources/font.otf");
+    if (!IsFontValid(font)) {CloseWindow(); return false;}
+
+    Vector2 textLength1 = MeasureTextEx(font, "Drag & Drop", 32, 0.1f);
+    Vector2 textLength2 = MeasureTextEx(font, "your files here", 32, 0.1f);
+
+    while (!WindowShouldClose())
     {
-        printf("Wrong usage: compress <filepath> -<flag>... \n");
-        return 1;
+        BeginDrawing();
+
+        ClearBackground(DARKGRAY);
+
+        //DrawTextEx(Font font, const char *text, Vector2 position, float fontSize, float spacing, Color tint)
+        DrawTextEx(font, "Drag & Drop", (Vector2){screenWidth / 2 - textLength1.x / 2, screenHeight / 2 - textLength1.y / 2 - 16}, 32, 0.1f, BLACK);
+        DrawTextEx(font, "your files here", (Vector2){screenWidth / 2 - textLength2.x / 2, screenHeight / 2 - textLength2.y / 2 + 16}, 32, 0.1f, BLACK);
+
+        EndDrawing();
     }
+
+    UnloadFont(font);
+    CloseWindow();
+    return true;
+}
+
+bool ConsoleProcedure(int argc, const char** argv)
+{
+    if (!argv || !(*argv) || argc < 2) return false;
 
     /*Fetch flags*/
     for (int i = 2; i < argc; i++)
@@ -167,13 +206,13 @@ int main(int argc, char** argv)
         switch (argv[i][1])
         {
         case 'd': flags |= FLAG_DEBUG; break;
-        case 'h': PrintHelpMenu(); return 0;
+        case 'h': PrintHelpMenu(); return true;
         default: printf("Flag %c not recognized\n", argv[i][1]); break;
         }
     }
 
     FILE* file = fopen(argv[1], "rb");
-    if (!file) {printf("Failed to open file at path: %s\n", argv[1]); return 1;}
+    if (!file) {printf("Failed to open file at path: %s\n", argv[1]); return false;}
 
     fseek(file, 0, SEEK_END);
     size_t len = ftell(file);
@@ -183,11 +222,11 @@ int main(int argc, char** argv)
 
     char* ogBuffer = malloc(len);
     if (!ogBuffer)
-    {printf("Failed to allocate %d bytes\n", len); fclose(file); return 1;}
+    {printf("Failed to allocate %d bytes\n", len); fclose(file); return false;}
     {
         size_t result = fread(ogBuffer, 1, len, file);
         fclose(file);
-        if (result < len) {printf("Something went wrong when reading the file.\n"); if (flags & FLAG_DEBUG) printf("DEBUG - bytes read: %zu\n", result); free(ogBuffer); return 1;}
+        if (result < len) {printf("Something went wrong when reading the file.\n"); if (flags & FLAG_DEBUG) printf("DEBUG - bytes read: %zu\n", result); free(ogBuffer); return false;}
     }
 
     size_t filePathLen = strlen(argv[1]);
@@ -204,5 +243,11 @@ int main(int argc, char** argv)
 
     free(ogBuffer);
 
-    return 0;
+    return true;
+}
+
+int main(int argc, char** argv)
+{
+    bool result = argc == 1 ? WindowProcedure() : ConsoleProcedure(argc, (const char**)argv);
+    return result;
 }
