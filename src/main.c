@@ -169,8 +169,8 @@ bool WindowProcedure()
 
     SetTargetFPS(60);
 
-    Font font = LoadFont("./resources/font.otf");
-    if (!IsFontValid(font)) {CloseWindow(); return false;}
+    Font font = LoadFont("../resources/font.otf");
+    if (!IsFontValid(font)) {font = GetFontDefault();}
 
     Vector2 textLength1 = MeasureTextEx(font, "Drag & Drop", 32, 0.1f);
     Vector2 textLength2 = MeasureTextEx(font, "your files here", 32, 0.1f);
