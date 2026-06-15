@@ -94,13 +94,13 @@ bool Extract(char* buf, size_t bufLen, const char* filePath)
     size_t currentExtractedSize = 0;
     for (size_t i = 0; i < bufLen; i+=2)
     {
-        if (i == bufLen) break;;
+        if (i == bufLen - 1) break;
         char value = buf[i];
-        char count = buf[i+1];
+        uint8_t count = buf[i+1];
 
         if (currentExtractedSize + count + 1 > allocationSize)
         {
-            char* newBuf = realloc(extractedBuffer, allocationSize * 2);
+            char* newBuf = realloc(extractedBuffer, (allocationSize + count + 1) * 2);
             if (!newBuf)
             {
                 free(extractedBuffer);
@@ -177,6 +177,50 @@ bool WindowProcedure()
 
     while (!WindowShouldClose())
     {
+        if (IsFileDropped())
+        {
+            FilePathList droppedFiles = LoadDroppedFiles();
+
+            for (int i = 0; i < droppedFiles.count; i++)
+            {
+                const char* currentFilePath = droppedFiles.paths[i];
+
+                FILE* file = fopen(currentFilePath, "rb");
+                if (!file) {printf("Failed to open file at path: %s\n", currentFilePath); continue;}
+
+                fseek(file, 0, SEEK_END);
+                size_t len = ftell(file);
+                fseek(file, 0, SEEK_SET);
+
+                if (flags & FLAG_DEBUG) printf("DEBUG - Chosen file size: %zu\n", len);
+
+                char* ogBuffer = malloc(len);
+                if (!ogBuffer)
+                {printf("Failed to allocate %d bytes\n", len); fclose(file); continue;}
+                {
+                    size_t result = fread(ogBuffer, 1, len, file);
+                    fclose(file);
+                    if (result < len) {printf("Something went wrong when reading the file.\n"); if (flags & FLAG_DEBUG) printf("DEBUG - bytes read: %zu\n", result); free(ogBuffer); continue;}
+                }
+
+                size_t filePathLen = strlen(currentFilePath);
+                if (filePathLen < 4) {printf("File path length is too short %s", currentFilePath); free(ogBuffer); return false;}
+                if (strcmp(currentFilePath + strlen(currentFilePath) - 4, ".cmp") != 0)
+                {
+                    if (Compress(ogBuffer, len, currentFilePath)) printf("Successfully compressed file %s\n", currentFilePath);
+                }
+
+                else
+                {
+                    if (Extract(ogBuffer, len, currentFilePath)) printf("Successfully extracted file %s\n", currentFilePath);
+                }
+
+                free(ogBuffer);
+            }
+
+            UnloadDroppedFiles(droppedFiles);
+        }
+
         BeginDrawing();
 
         ClearBackground(DARKGRAY);
@@ -230,6 +274,7 @@ bool ConsoleProcedure(int argc, const char** argv)
     }
 
     size_t filePathLen = strlen(argv[1]);
+    if (filePathLen < 4) {printf("File path length is too short %s", argv[1]); free(ogBuffer); return false;}
 
     if (strcmp(argv[1] + filePathLen - 4, ".cmp") != 0)
     {
